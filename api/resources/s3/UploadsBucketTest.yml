@@ -1,0 +1,27 @@
+Resources:
+  UploadsBucketTest:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: uploads-bucket-test
+      LifecycleConfiguration:
+        Rules:
+          - Id: auto-delete-mpus-after-1-day
+            Status: Enabled
+            AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 1
+
+          - Id: auto-delete-after-1-day
+            Status: Enabled
+            ExpirationInDays: 1
+
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - PUT
+              - POST
+            AllowedOrigins:
+              - "*"
+            ExposedHeaders:
+              - Etag

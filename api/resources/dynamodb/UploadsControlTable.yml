@@ -1,0 +1,16 @@
+Resources:
+  UploadControlTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: UploadControlTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: key
+          AttributeType: S
+        - AttributeName: bytesRange
+          AttributeType: S
+      KeySchema:
+        - AttributeName: key
+          KeyType: HASH
+        - AttributeName: bytesRange
+          KeyType: RANGE

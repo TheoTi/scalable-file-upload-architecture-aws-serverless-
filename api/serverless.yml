@@ -1,0 +1,118 @@
+org: theodev
+service: uploads
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: sa-east-1
+  memorySize: 128
+
+  environment:
+    DYNAMO_UPLOADS_CONTROL_TABLE: !Ref UploadControlTable
+    DYNAMO_RECORDS_TABLE: !Ref RecordsTable
+    UPLOADS_BUCKET_TEST_NAME: !Ref UploadsBucketTest
+    CONTROL_CHUNKS_QUEUE_URL: !Ref ControlChunksQueue
+
+  iam:
+    role:
+      statements:
+        # DynamoDB
+        - Effect: Allow
+          Action:
+            - dynamodb:PutItem
+            - dynamodb:Scan
+            - dynamodb:UpdateItem
+          Resource:
+            - !GetAtt UploadControlTable.Arn
+            - !GetAtt RecordsTable.Arn
+
+        # S3
+        - Effect: Allow
+          Action:
+            - s3:PutObject
+            - s3:AbortMultipartUpload
+            - s3:GetObject
+            - s3:ListBucketMultipartUploads
+          Resource:
+            - !GetAtt UploadsBucketTest.Arn
+            - !Join ["/", [!GetAtt UploadsBucketTest.Arn, "*"]]
+
+        # SQS
+        - Effect: Allow
+          Action:
+            - sqs:SendMessage
+          Resource: !GetAtt ControlChunksQueue.Arn
+
+  httpApi:
+    cors:
+      allowedOrigins: ["*"]
+      allowedHeaders: ["Content-Type", "X-Amz-Date"]
+      allowedMethods: ["OPTIONS", "POST", "GET", "DELETE"]
+      allowCredentials: false
+
+package:
+  individually: true
+
+build:
+  esbuild:
+    bundle: true
+    minify: true
+    sourcemap: false
+
+functions:
+  initiateMPU:
+    handler: src/functions/http/initiateMPU.handler
+    events:
+      - httpApi:
+          path: /initiate-mpu
+          method: POST
+
+  completeMPU:
+    handler: src/functions/http/completeMPU.handler
+    events:
+      - httpApi:
+          path: /complete-mpu
+          method: POST
+
+  listPendingMPUs:
+    handler: src/functions/http/listPendingMPUs.handler
+    events:
+      - httpApi:
+          path: /list-pending-mpus
+          method: GET
+
+  abortMPU:
+    handler: src/functions/http/abortMPU.handler
+    events:
+      - httpApi:
+          path: /abort-mpu
+          method: DELETE
+
+  abortAllPendingMPUs:
+    handler: src/functions/http/abortAllPendingMPUs.handler
+    events:
+      - httpApi:
+          path: /abort-all-pending-mpus
+          method: DELETE
+
+  handleNewUpload:
+    handler: src/functions/http/handleNewUpload.handler
+    timeout: 900
+    events:
+      - s3:
+          bucket: !Ref UploadsBucketTest
+          event: s3:ObjectCreated:*
+          existing: true
+
+  processChunk:
+    handler: src/functions/queues/processChunk.handler
+    events:
+      - sqs:
+          arn: !GetAtt ControlChunksQueue.Arn
+          batchSize: 1
+
+resources:
+  - ${file(./resources/s3/UploadsBucketTest.yml)}
+  - ${file(./resources/dynamodb/UploadsControlTable.yml)}
+  - ${file(./resources/dynamodb/RecordsTable.yml)}
+  - ${file(./resources/sqs/ControlChunksQueue.yml)}

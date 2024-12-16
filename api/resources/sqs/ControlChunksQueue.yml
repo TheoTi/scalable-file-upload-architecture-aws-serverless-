@@ -1,0 +1,16 @@
+Resources:
+  ControlChunksQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ControlChunksQueue
+      ReceiveMessageWaitTimeSeconds: 20
+      VisibilityTimeout: 180
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ControlChunksQueueDLQ.Arn
+        maxReceiveCount: 2
+
+  ControlChunksQueueDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: ControlChunksQueueDLQ
+      MessageRetentionPeriod: 1209600 # 14 days
